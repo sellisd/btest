@@ -1,19 +1,24 @@
 """Module for character analysis and gender detection."""
 
-from dataclasses import dataclass
-from typing import Dict, List, Optional, Set
+from typing import List, Optional, Dict, Any
+from pydantic import BaseModel, Field
 
-@dataclass
-class Character:
+from .llm_helper import detect_gender
+
+class Character(BaseModel):
     """Represents a character in the script."""
     
     name: str
-    lines: List[str] = None
-    gender: str = "unknown"
+    lines: Optional[List[str]] = Field(default=None)
+    gender: str = Field(default="unknown")
     
     def __hash__(self):
         """Hash based on character name."""
         return hash(self.name)
+    
+    model_config = {
+        "arbitrary_types_allowed": True
+    }
 
 class CharacterClassifier:
     """Analyzes and classifies characters based on name and dialogue context."""
@@ -50,7 +55,7 @@ class CharacterClassifier:
             "brother", "uncle", "son", "husband", "boyfriend", "mr", "sir"
         }
 
-    def classify_character(self, character: Character, script_text: str = None) -> Character:
+    def classify_character(self, character: Character, script_text: Optional[str] = None) -> Character:
         """Determine character's likely gender based on name and context.
         
         Args:
@@ -78,6 +83,15 @@ class CharacterClassifier:
             context_gender = self._analyze_context_for_gender(character.name, script_text)
             if context_gender != "unknown":
                 character.gender = context_gender
+                return character
+
+        # Use LLM as a final fallback for gender detection
+        if script_text:
+            # Create context from character's lines and surrounding text
+            context = "\n".join(character.lines) if character.lines else script_text
+            llm_gender = detect_gender(character.name, context)
+            if llm_gender != "unknown":
+                character.gender = llm_gender
                 return character
         
         # Keep as unknown if no confident determination
