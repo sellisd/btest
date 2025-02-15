@@ -81,9 +81,29 @@ If Ollama is not available, the package falls back to rule-based analysis.
 
 ## Configuration
 
-LLM features can be customized through environment variables:
+### LLM Configuration
+The package's LLM features can be customized through environment variables:
 - `OLLAMA_MODEL`: Choose a different model (default: "llama2")
-- `OLLAMA_HOST`: Connect to a remote Ollama instance
+- `OLLAMA_HOST`: Connect to a remote Ollama instance (optional)
+- `OLLAMA_TIMEOUT`: Set request timeout in seconds (default: 30)
+- `OLLAMA_CACHE_SIZE`: Set LLM response cache size (default: 128)
+
+### Logging Configuration
+Logging behavior can be customized through environment variables:
+- `LOG_LEVEL`: Set logging level (default: "INFO")
+- `LOG_FORMAT`: Customize log message format (default: "%(asctime)s - %(name)s - %(levelname)s - %(message)s")
+
+### Development Configuration
+When developing or contributing:
+1. Create a `.env` file in the project root:
+   ```bash
+   OLLAMA_MODEL=llama2
+   OLLAMA_HOST=localhost:11434  # Optional
+   OLLAMA_TIMEOUT=30
+   OLLAMA_CACHE_SIZE=128
+   LOG_LEVEL=DEBUG  # Use DEBUG for development
+   ```
+2. The package will automatically load these settings
 
 ## Development
 
@@ -99,8 +119,66 @@ source .venv/bin/activate  # On Windows: .venv\Scripts\activate
 # Install development dependencies
 pip install -e ".[dev]"
 
-# Run tests
-pytest
+# Run tests with coverage
+pytest --cov=src/core tests/
+
+# Run specific test files
+pytest tests/test_analyzer.py
+pytest tests/test_script_finder.py
+
+# Run tests with logging
+pytest -v --log-cli-level=DEBUG
+```
+
+### Project Structure
+
+```
+btest/
+├── src/
+│   └── core/
+│       ├── __init__.py
+│       ├── analyzer.py      # Main Bechdel test analyzer
+│       ├── character.py     # Character classification
+│       ├── config.py        # Configuration management
+│       ├── conversation.py  # Conversation analysis
+│       ├── exceptions.py    # Custom exceptions
+│       ├── llm_helper.py    # LLM integration
+│       ├── logger.py        # Logging configuration
+│       ├── script_finder.py # Script discovery
+│       └── text_processor.py # Text processing utilities
+├── tests/
+│   ├── test_analyzer.py
+│   ├── test_config.py
+│   ├── test_exceptions.py
+│   └── test_script_finder.py
+└── scripts/
+    └── analyze_movie.py    # CLI script example
+```
+
+### Error Handling
+
+The package uses a custom exception hierarchy for clear error handling:
+
+```python
+BtestError
+├── LLMError          # LLM-related issues
+├── ScriptError      # Base for script issues
+│   ├── ScriptNotFoundError
+│   └── ScriptParseError
+├── ConfigurationError # Config issues
+├── ValidationError   # Validation failures
+├── ConversationError # Conversation analysis issues
+└── CharacterError   # Character detection issues
+```
+
+Example error handling:
+```python
+from btest.core.exceptions import ScriptNotFoundError
+
+try:
+    result = analyzer.analyze_movie("Non-existent Movie")
+except ScriptNotFoundError as e:
+    print(f"Movie script not found: {e}")
 ```
 
 ## Contributing

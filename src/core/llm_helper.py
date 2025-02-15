@@ -7,14 +7,21 @@ from langchain_ollama import OllamaLLM
 from langchain.prompts import PromptTemplate
 from langchain_core.runnables import RunnablePassthrough, RunnableParallel
 
-# Default model configuration
-DEFAULT_MODEL = "llama2"
+from .config import llm_config
+from .exceptions import LLMError, ConfigurationError
+from .logger import setup_logger
+
+logger = setup_logger(__name__)
 
 try:
-    # Initialize Ollama with a smaller model
-    llm = OllamaLLM(model=DEFAULT_MODEL)
+    # Initialize Ollama with configured model
+    llm = OllamaLLM(
+        model=llm_config.model,
+        base_url=f"http://{llm_config.host}" if llm_config.host else None,
+        timeout=llm_config.timeout
+    )
 except Exception as e:
-    print(f"Warning: Could not initialize Ollama. Make sure it's running locally. Error: {e}")
+    logger.warning(f"Could not initialize Ollama. Make sure it's running locally. Error: {e}")
     llm = None
 
 # Prompt templates
@@ -62,7 +69,7 @@ if llm:
 else:
     gender_chain = topic_chain = None
 
-@lru_cache(maxsize=128)
+@lru_cache(maxsize=llm_config.cache_size)
 def detect_gender(character_name: str, context: Optional[str] = None) -> str:
     """Detect character gender using LLM analysis.
     
@@ -72,8 +79,12 @@ def detect_gender(character_name: str, context: Optional[str] = None) -> str:
         
     Returns:
         Gender as "female", "male", or "unknown".
+        
+    Raises:
+        LLMError: If LLM analysis fails and no fallback is available.
     """
     if not llm:
+        logger.warning("LLM not initialized, returning unknown gender")
         return "unknown"
         
     try:
@@ -84,12 +95,14 @@ def detect_gender(character_name: str, context: Optional[str] = None) -> str:
         result = gender_chain.invoke(inputs)
         if result in ["female", "male", "unknown"]:
             return result
+            
+        logger.warning(f"Unexpected LLM gender result: {result}, defaulting to unknown")
         return "unknown"
     except Exception as e:
-        print(f"LLM gender detection failed: {e}")
-        return "unknown"
+        logger.error(f"LLM gender detection failed for {character_name}: {e}")
+        raise LLMError(f"Gender detection failed: {e}") from e
 
-@lru_cache(maxsize=128)
+@lru_cache(maxsize=llm_config.cache_size)
 def is_conversation_about_men(dialogue: List[str]) -> bool:
     """Determine if a conversation is primarily about men using LLM analysis.
     
@@ -98,24 +111,39 @@ def is_conversation_about_men(dialogue: List[str]) -> bool:
         
     Returns:
         True if the conversation is primarily about men, False otherwise.
+        
+    Raises:
+        LLMError: If LLM analysis fails and no fallback is available.
     """
     if not llm:
-        # Fallback to simpler heuristic
-        male_terms = {
-            "he", "him", "his", "himself", "man", "men", "guy", "guys",
-            "father", "brother", "son", "husband", "boyfriend"
-        }
-        text = " ".join(dialogue).lower()
-        words = set(text.split())
-        male_word_count = len(words.intersection(male_terms))
-        return male_word_count > len(words) * 0.1
+        logger.info("LLM not initialized, using heuristic analysis")
+        return _heuristic_male_topic_detection(dialogue)
         
     try:
         inputs: Dict[str, Any] = {"dialogue": "\n".join(dialogue)}
         return topic_chain.invoke(inputs)
     except Exception as e:
-        print(f"LLM topic detection failed: {e}")
-        return False
+        logger.error(f"LLM topic detection failed: {e}")
+        logger.info("Falling back to heuristic analysis")
+        return _heuristic_male_topic_detection(dialogue)
+
+def _heuristic_male_topic_detection(dialogue: List[str]) -> bool:
+    """Fallback method using simple heuristics to detect male-focused topics.
+    
+    Args:
+        dialogue: List of dialogue lines to analyze.
+        
+    Returns:
+        True if the conversation appears to be about men.
+    """
+    male_terms = {
+        "he", "him", "his", "himself", "man", "men", "guy", "guys",
+        "father", "brother", "son", "husband", "boyfriend"
+    }
+    text = " ".join(dialogue).lower()
+    words = set(text.split())
+    male_word_count = len(words.intersection(male_terms))
+    return male_word_count > len(words) * 0.1
 
 def validate_bechdel_result(
     female_characters: List[str],
@@ -131,11 +159,17 @@ def validate_bechdel_result(
         
     Returns:
         Validated result (True if passes Bechdel test, False otherwise).
+        
+    Raises:
+        ValidationError: If validation fails with no fallback available.
+        ConfigurationError: If LLM is not properly configured.
     """
     if not llm:
+        logger.warning("LLM not initialized, using original result")
         return original_result
         
     if not female_characters or len(female_characters) < 2:
+        logger.info("Not enough female characters for Bechdel test")
         return False
         
     try:
@@ -154,7 +188,15 @@ def validate_bechdel_result(
         """
         
         result = llm.invoke(validation_prompt)
-        return result.strip().lower() == "true"
+        validated = result.strip().lower() == "true"
+        
+        if validated != original_result:
+            logger.info(
+                f"LLM validation differs from original result: "
+                f"original={original_result}, validated={validated}"
+            )
+            
+        return validated
     except Exception as e:
-        print(f"LLM validation failed: {e}")
-        return original_result
+        logger.error(f"LLM validation failed: {e}")
+        raise ValidationError(f"Bechdel test validation failed: {e}") from e

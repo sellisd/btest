@@ -3,8 +3,7 @@
 import os
 import logging
 from pathlib import Path
-from typing import Optional, Dict
-import requests
+from typing import Optional, Dict, List
 import pandas as pd
 
 logger = logging.getLogger(__name__)
@@ -12,68 +11,73 @@ logger = logging.getLogger(__name__)
 class ScriptFinder:
     """Handles retrieving movie scripts from Cornell Movie Dialog Corpus."""
     
-    # Base URL for the dataset files
-    DATASET_URL = "https://raw.githubusercontent.com/sellisd/btest/main/data/movie_data/"
-    
     def __init__(self, data_dir: Optional[str] = None):
         """Initialize ScriptFinder.
         
         Args:
             data_dir: Directory to store downloaded dataset files. 
-                     Defaults to ~/btest_data if not specified.
+                     Defaults to local Cornell corpus if not specified.
         """
         if data_dir is None:
-            data_dir = os.path.expanduser("~/btest_data")
+            data_dir = "data/cornell_data/cornell_movie_dialogs_corpus/cornell movie-dialogs corpus"
         self.data_dir = Path(data_dir)
-        self.data_dir.mkdir(parents=True, exist_ok=True)
+        if not self.data_dir.exists():
+            raise FileNotFoundError(f"Cornell Movie Dialog Corpus not found at {self.data_dir}")
         
         # Cache for loaded data
         self._movies_df: Optional[pd.DataFrame] = None
         self._dialogs: Optional[Dict] = None
+        self._lines: Optional[Dict] = None
         
-    def _download_dataset(self) -> None:
-        """Download dataset files if not already present."""
-        files = ["movie_titles_metadata.txt", "movie_lines.txt"]
-        
-        for filename in files:
-            file_path = self.data_dir / filename
-            if not file_path.exists():
-                logger.info(f"Downloading {filename}...")
-                url = f"{self.DATASET_URL}{filename}"
-                try:
-                    response = requests.get(url)
-                    response.raise_for_status()
-                    file_path.write_text(response.text)
-                except Exception as e:
-                    logger.error(f"Failed to download {filename}: {e}")
-                    raise
-    
     def _load_data(self) -> None:
         """Load dataset into memory if not already loaded."""
         if self._movies_df is None or self._dialogs is None:
             try:
-                self._download_dataset()
-                
                 # Load movie metadata
                 movies_path = self.data_dir / "movie_titles_metadata.txt"
-                self._movies_df = pd.read_csv(movies_path, sep=" \+\+\+ ", 
+                self._movies_df = pd.read_csv(movies_path, sep=" \\+\\+\\+\\$\\+\\+\\+ ", 
                                           names=["id", "title", "year", "rating", "votes", "genres"],
-                                          engine="python")
+                                          engine="python",
+                                          encoding='iso-8859-1',
+                                          dtype={"id": str, "title": str, "year": str, 
+                                                "rating": float, "votes": float, "genres": str})
                 
-                # Load movie lines
+                # Load movie lines into a dictionary for quick lookup
                 lines_path = self.data_dir / "movie_lines.txt"
-                self._dialogs = {}
+                self._lines = {}
                 with open(lines_path, 'r', encoding='iso-8859-1') as f:
                     for line in f:
                         parts = line.strip().split(" +++$+++ ")
                         if len(parts) == 5:
+                            line_id, character, movie_id, _, text = parts
+                            self._lines[line_id] = {
+                                'character': character,
+                                'movie_id': movie_id,
+                                'text': text
+                            }
+                
+                # Load movie conversations which define the line ordering
+                conversations_path = self.data_dir / "movie_conversations.txt"
+                self._dialogs = {}
+                with open(conversations_path, 'r', encoding='iso-8859-1') as f:
+                    for conversation in f:
+                        parts = conversation.strip().split(" +++$+++ ")
+                        if len(parts) == 4:
+                            # Extract line IDs from conversation
                             movie_id = parts[2]
+                            line_ids = eval(parts[3])  # Convert string list to actual list
+                            
                             if movie_id not in self._dialogs:
                                 self._dialogs[movie_id] = []
-                            self._dialogs[movie_id].append({
-                                'character': parts[1],
-                                'text': parts[4]
-                            })
+                            
+                            # Add each line in the conversation
+                            for line_id in line_ids:
+                                if line_id in self._lines:
+                                    line = self._lines[line_id]
+                                    self._dialogs[movie_id].append({
+                                        'character': line['character'],
+                                        'text': line['text']
+                                    })
                             
             except Exception as e:
                 logger.error(f"Failed to load dataset: {e}")
@@ -92,7 +96,8 @@ class ScriptFinder:
         
         # Search for movie
         title = title.lower()
-        movie = self._movies_df[self._movies_df['title'].str.lower().str.contains(title)]
+        # Fill NaN values and convert to string before searching
+        movie = self._movies_df[self._movies_df['title'].fillna('').astype(str).str.lower().str.contains(title)]
         
         if len(movie) == 0:
             logger.warning(f"No movie found matching title: {title}")
