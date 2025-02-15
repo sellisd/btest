@@ -50,10 +50,18 @@ class TestExceptions(unittest.TestCase):
     
     def test_exception_chaining(self):
         """Test exception chaining."""
-        original = ValueError("Original error")
-        chained = LLMError("Chained error") from original
+        def raise_chained():
+            try:
+                raise ValueError("Original error")
+            except ValueError as original:
+                raise LLMError("Chained error") from original
         
-        self.assertIs(chained.__cause__, original)
+        with self.assertRaises(LLMError) as context:
+            raise_chained()
+            
+        self.assertEqual(str(context.exception), "Chained error")
+        self.assertIsInstance(context.exception.__cause__, ValueError)
+        self.assertEqual(str(context.exception.__cause__), "Original error")
         
     def test_error_usage(self):
         """Test practical usage of exceptions."""

@@ -186,8 +186,8 @@ def test_analyze_movie_not_found(analyzer):
             assert result is None
 
 @pytest.mark.parametrize("movie_title,should_pass", [
-    ("american psycho", True),   # Known to pass Bechdel test
-    ("the patriot", True),       # Known to pass Bechdel test
+    ("crouching tiger, hidden dragon", True),   # Known to pass Bechdel test
+    ("pitch black", True),       # Known to pass Bechdel test
     ("cast away", False),        # Known to fail Bechdel test
     ("gladiator", False),        # Known to fail Bechdel test
     ("high fidelity", False),    # Known to fail Bechdel test

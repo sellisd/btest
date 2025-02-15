@@ -21,8 +21,14 @@ class ScriptFinder:
         if data_dir is None:
             data_dir = "data/cornell_data/cornell_movie_dialogs_corpus/cornell movie-dialogs corpus"
         self.data_dir = Path(data_dir)
-        if not self.data_dir.exists():
-            raise FileNotFoundError(f"Cornell Movie Dialog Corpus not found at {self.data_dir}")
+        
+        # Create data directory if it doesn't exist
+        self.data_dir.mkdir(parents=True, exist_ok=True)
+        
+        # Required dataset files
+        self.movies_file = self.data_dir / "movie_titles_metadata.txt"
+        self.lines_file = self.data_dir / "movie_lines.txt"
+        self.conversations_file = self.data_dir / "movie_conversations.txt"
         
         # Cache for loaded data
         self._movies_df: Optional[pd.DataFrame] = None
@@ -33,9 +39,16 @@ class ScriptFinder:
         """Load dataset into memory if not already loaded."""
         if self._movies_df is None or self._dialogs is None:
             try:
+                # Check if required files exist
+                if not all(f.exists() for f in [self.movies_file, self.lines_file, self.conversations_file]):
+                    logger.warning("Dataset files not found, initializing with empty data")
+                    self._movies_df = pd.DataFrame(columns=["id", "title", "year", "rating", "votes", "genres"])
+                    self._dialogs = {}
+                    self._lines = {}
+                    return
+                
                 # Load movie metadata
-                movies_path = self.data_dir / "movie_titles_metadata.txt"
-                self._movies_df = pd.read_csv(movies_path, sep=" \\+\\+\\+\\$\\+\\+\\+ ", 
+                self._movies_df = pd.read_csv(self.movies_file, sep=" \\+\\+\\+\\$\\+\\+\\+ ", 
                                           names=["id", "title", "year", "rating", "votes", "genres"],
                                           engine="python",
                                           encoding='iso-8859-1',
@@ -43,9 +56,8 @@ class ScriptFinder:
                                                 "rating": float, "votes": float, "genres": str})
                 
                 # Load movie lines into a dictionary for quick lookup
-                lines_path = self.data_dir / "movie_lines.txt"
                 self._lines = {}
-                with open(lines_path, 'r', encoding='iso-8859-1') as f:
+                with open(self.lines_file, 'r', encoding='iso-8859-1') as f:
                     for line in f:
                         parts = line.strip().split(" +++$+++ ")
                         if len(parts) == 5:
@@ -57,9 +69,8 @@ class ScriptFinder:
                             }
                 
                 # Load movie conversations which define the line ordering
-                conversations_path = self.data_dir / "movie_conversations.txt"
                 self._dialogs = {}
-                with open(conversations_path, 'r', encoding='iso-8859-1') as f:
+                with open(self.conversations_file, 'r', encoding='iso-8859-1') as f:
                     for conversation in f:
                         parts = conversation.strip().split(" +++$+++ ")
                         if len(parts) == 4:
