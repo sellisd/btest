@@ -7,6 +7,8 @@ from typing import List, Optional, Set
 from .text_processor import TextProcessor
 from .character import Character, CharacterClassifier
 from .conversation import Conversation, ConversationAnalyzer
+from .llm_helper import validate_bechdel_result
+from .script_finder import ScriptFinder
 
 @dataclass
 class BechdelResult:
@@ -97,12 +99,34 @@ class BechdelAnalyzer:
                 failure_reasons=failure_reasons
             )
 
-        # All criteria passed
-        return BechdelResult(
+        # Base result from rule-based analysis
+        result = BechdelResult(
             passes_test=True,
             female_characters=female_characters,
             conversations=conversations
         )
+        
+        # Validate result using LLM
+        try:
+            # Extract conversation texts for validation
+            conv_texts = [conv.dialogue for conv in non_male_conversations]
+            female_char_names = [char.name for char in female_characters]
+            
+            # Get LLM validation of the result
+            validated = validate_bechdel_result(
+                female_char_names, 
+                conv_texts, 
+                True  # Original pass result
+            )
+            
+            if not validated:
+                result.passes_test = False
+                result.failure_reasons = ["LLM validation determined test should fail"]
+        except Exception:
+            # If LLM validation fails, stick with rule-based result
+            pass
+
+        return result
 
     def analyze_script_file(self, file_path: str) -> BechdelResult:
         """Analyze script from file.
@@ -115,3 +139,20 @@ class BechdelAnalyzer:
         """
         script_text = Path(file_path).read_text()
         return self.analyze_script(script_text)
+        
+    def analyze_movie(self, title: str) -> Optional[BechdelResult]:
+        """Analyze movie by title using the script finder.
+        
+        Args:
+            title: Movie title to search and analyze.
+            
+        Returns:
+            BechdelResult if script is found, None otherwise.
+        """
+        finder = ScriptFinder()
+        script = finder.find_script(title)
+        
+        if script is None:
+            return None
+            
+        return self.analyze_script(script)

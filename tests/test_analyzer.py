@@ -1,12 +1,14 @@
 """Test module for the Bechdel test analyzer."""
 
 from pathlib import Path
+from unittest.mock import patch, mock_open
 import pytest
 
 from src.core.text_processor import TextProcessor
 from src.core.character import Character, CharacterClassifier
 from src.core.conversation import ConversationAnalyzer
 from src.core.analyzer import BechdelAnalyzer, BechdelResult
+from src.core.script_finder import ScriptFinder
 
 # Path to sample script file
 SCRIPT_PATH = Path("data/sample_scripts/sample_script.txt")
@@ -132,3 +134,46 @@ def test_analyzer_with_script_file(analyzer):
     assert isinstance(result, BechdelResult)
     assert result.passes_test is True
     assert result.conversations is not None
+
+# New tests for analyze_movie functionality
+MOCK_MOVIES_DATA = """m0 +++ Test Movie +++ 2020 +++ 8.5 +++ 1000 +++ genre1"""
+MOCK_LINES_DATA = """L1 +++$+++ SARAH +++$+++ m0 +++$+++ SCENE1 +++$+++ Hello Mary!
+L2 +++$+++ MARY +++$+++ m0 +++$+++ SCENE1 +++$+++ Hi Sarah! Let's talk about science."""
+
+def test_analyze_movie_found(analyzer):
+    """Test analyzing movie by title when script is found."""
+    with patch('builtins.open', mock_open(read_data=MOCK_MOVIES_DATA)) as mock_movies_file, \
+         patch('builtins.open', mock_open(read_data=MOCK_LINES_DATA)) as mock_lines_file, \
+         patch('requests.get') as mock_get:
+             
+        mock_get.return_value.text = "mock data"
+        
+        def mock_open_files(*args, **kwargs):
+            if str(args[0]).endswith('movie_titles_metadata.txt'):
+                return mock_movies_file.return_value
+            return mock_lines_file.return_value
+            
+        with patch('builtins.open', mock_open_files):
+            result = analyzer.analyze_movie("Test Movie")
+            
+            assert result is not None
+            assert isinstance(result, BechdelResult)
+            assert len(result.female_characters) == 2
+            assert result.passes_test is True
+
+def test_analyze_movie_not_found(analyzer):
+    """Test analyzing movie by title when script is not found."""
+    with patch('builtins.open', mock_open(read_data=MOCK_MOVIES_DATA)) as mock_movies_file, \
+         patch('builtins.open', mock_open(read_data=MOCK_LINES_DATA)) as mock_lines_file, \
+         patch('requests.get') as mock_get:
+             
+        mock_get.return_value.text = "mock data"
+        
+        def mock_open_files(*args, **kwargs):
+            if str(args[0]).endswith('movie_titles_metadata.txt'):
+                return mock_movies_file.return_value
+            return mock_lines_file.return_value
+            
+        with patch('builtins.open', mock_open_files):
+            result = analyzer.analyze_movie("Nonexistent Movie")
+            assert result is None

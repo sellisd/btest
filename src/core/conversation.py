@@ -3,6 +3,7 @@
 from dataclasses import dataclass
 from typing import List, Dict, Set, Tuple
 from .character import Character
+from .llm_helper import is_conversation_about_men
 
 @dataclass
 class Conversation:
@@ -65,11 +66,18 @@ class ConversationAnalyzer:
             if last_speaker and name != last_speaker:
                 # We have a back-and-forth between characters
                 if len(current_participants) >= 2:
+                    # First try LLM analysis for topic detection
+                    try:
+                        about_men = is_conversation_about_men(current_dialogue)
+                    except Exception:
+                        # Fallback to rule-based analysis if LLM fails
+                        about_men = self._is_about_men(current_dialogue)
+                        
                     conversations.append(
                         Conversation(
                             participants=current_participants.copy(),
                             dialogue=current_dialogue.copy(),
-                            about_men=self._is_about_men(current_dialogue)
+                            about_men=about_men
                         )
                     )
             
@@ -83,18 +91,24 @@ class ConversationAnalyzer:
 
             # If we're at the end, check if we should add the final conversation
             if i == len(sequence) - 1 and len(current_participants) >= 2:
+                about_men = False
+                try:
+                    about_men = is_conversation_about_men(current_dialogue)
+                except Exception:
+                    about_men = self._is_about_men(current_dialogue)
+                    
                 conversations.append(
                     Conversation(
                         participants=current_participants.copy(),
                         dialogue=current_dialogue.copy(),
-                        about_men=self._is_about_men(current_dialogue)
+                        about_men=about_men
                     )
                 )
 
         return conversations
 
     def _is_about_men(self, dialogue: List[str]) -> bool:
-        """Determine if conversation is primarily about men.
+        """Determine if conversation is primarily about men using rule-based analysis.
         
         Args:
             dialogue: List of dialogue lines.

@@ -30,7 +30,17 @@ from btest.core.analyzer import BechdelAnalyzer
 # Create analyzer instance
 analyzer = BechdelAnalyzer()
 
-# Analyze script from file
+# Analyze a movie directly by title
+result = analyzer.analyze_movie("The Matrix")
+if result:
+    print(f"Passed Bechdel test: {result.passes_test}")
+    print(f"Female characters: {[char.name for char in result.female_characters]}")
+    if not result.passes_test:
+        print(f"Failure reasons: {result.failure_reasons}")
+else:
+    print("Movie script not found")
+
+# Or analyze a local script file
 result = analyzer.analyze_script_file("path/to/script.txt")
 
 # Print results
@@ -39,6 +49,17 @@ print(f"Female characters: {[char.name for char in result.female_characters]}")
 if not result.passes_test:
     print(f"Failure reasons: {result.failure_reasons}")
 ```
+
+## Movie Script Sources
+
+The package includes a built-in movie script database from the Cornell Movie Dialog Corpus. Scripts are automatically downloaded and cached locally when needed.
+
+To analyze a movie:
+1. Search for a movie by title using `analyze_movie()`
+2. The package will download and parse the script if available
+3. Results are cached locally for future use
+
+If a script isn't found in the database, you can still analyze a local script file using `analyze_script_file()`.
 
 ## Using LLM Features
 
