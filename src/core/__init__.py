@@ -2,7 +2,7 @@
 
 import logging
 from .config import llm_config, log_config
-from .exceptions import BtestError
+from .exceptions import BtestError, LLMError, ConfigurationError, ScrapingError, ConversationError
 from .logger import setup_logger
 from .text_processor import TextProcessor
 from .character import Character, CharacterClassifier
@@ -21,6 +21,10 @@ __all__ = [
     "ConversationAnalyzer",
     "BechdelAnalyzer",
     "BtestError",
+    "LLMError",
+    "ConfigurationError",
+    "ScrapingError",
+    "ConversationError",
 ]
 
 # Log configuration on import

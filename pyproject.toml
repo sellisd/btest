@@ -20,6 +20,11 @@ dependencies = [
     "langchain-ollama>=0.0.1",
     "pydantic>=2.7.4",
     "requests>=2.31.0",
+    "beautifulsoup4>=4.12.0",
+    "aiohttp>=3.9.0",
+    "fastapi>=0.109.0",
+    "uvicorn>=0.27.0",
+    "httpx>=0.26.0",  # For testing FastAPI
 ]
 
 [tool.pytest.ini_options]

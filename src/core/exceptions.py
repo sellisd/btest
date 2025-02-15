@@ -1,37 +1,29 @@
-"""Custom exceptions for the btest package."""
+"""Custom exceptions for the application."""
 
 class BtestError(Exception):
-    """Base exception for all btest errors."""
-    pass
+    """Base exception for all application errors."""
+    
+    def __init__(self, message: str):
+        """Initialize BtestError.
+        
+        Args:
+            message: Error message explaining what went wrong
+        """
+        self.message = message
+        super().__init__(self.message)
 
 class LLMError(BtestError):
-    """Raised when there are issues with LLM operations."""
-    pass
-
-class ScriptError(BtestError):
-    """Base class for script-related errors."""
-    pass
-
-class ScriptNotFoundError(ScriptError):
-    """Raised when a requested script cannot be found."""
-    pass
-
-class ScriptParseError(ScriptError):
-    """Raised when a script cannot be parsed correctly."""
+    """Exception raised when LLM operations fail."""
     pass
 
 class ConfigurationError(BtestError):
-    """Raised when there are configuration issues."""
+    """Exception raised when configuration is invalid."""
     pass
 
-class ValidationError(BtestError):
-    """Raised when validation fails."""
+class ScrapingError(BtestError):
+    """Exception raised when script scraping fails."""
     pass
 
 class ConversationError(BtestError):
-    """Raised when there are issues analyzing conversations."""
-    pass
-
-class CharacterError(BtestError):
-    """Raised when there are issues with character analysis."""
+    """Exception raised when conversation processing fails."""
     pass
