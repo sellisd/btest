@@ -136,21 +136,28 @@ def test_analyzer_with_script_file(analyzer):
     assert result.conversations is not None
 
 # New tests for analyze_movie functionality
-MOCK_MOVIES_DATA = """m0 +++ Test Movie +++ 2020 +++ 8.5 +++ 1000 +++ genre1"""
+MOCK_MOVIES_DATA = """m0 +++$+++ Test Movie +++$+++ 2020 +++$+++ 8.5 +++$+++ 1000 +++$+++ genre1"""
+
 MOCK_LINES_DATA = """L1 +++$+++ SARAH +++$+++ m0 +++$+++ SCENE1 +++$+++ Hello Mary!
 L2 +++$+++ MARY +++$+++ m0 +++$+++ SCENE1 +++$+++ Hi Sarah! Let's talk about science."""
+
+MOCK_CONVERSATIONS_DATA = """c1 +++$+++ SARAH +++$+++ m0 +++$+++ ['L1', 'L2']"""
 
 def test_analyze_movie_found(analyzer):
     """Test analyzing movie by title when script is found."""
     with patch('builtins.open', mock_open(read_data=MOCK_MOVIES_DATA)) as mock_movies_file, \
          patch('builtins.open', mock_open(read_data=MOCK_LINES_DATA)) as mock_lines_file, \
+         patch('builtins.open', mock_open(read_data=MOCK_CONVERSATIONS_DATA)) as mock_conv_file, \
          patch('requests.get') as mock_get:
              
         mock_get.return_value.text = "mock data"
         
         def mock_open_files(*args, **kwargs):
-            if str(args[0]).endswith('movie_titles_metadata.txt'):
+            path = str(args[0])
+            if path.endswith('movie_titles_metadata.txt'):
                 return mock_movies_file.return_value
+            elif path.endswith('movie_conversations.txt'):
+                return mock_conv_file.return_value
             return mock_lines_file.return_value
             
         with patch('builtins.open', mock_open_files):
@@ -177,3 +184,55 @@ def test_analyze_movie_not_found(analyzer):
         with patch('builtins.open', mock_open_files):
             result = analyzer.analyze_movie("Nonexistent Movie")
             assert result is None
+
+@pytest.mark.parametrize("movie_title,should_pass", [
+    ("american psycho", True),   # Known to pass Bechdel test
+    ("the patriot", True),       # Known to pass Bechdel test
+    ("cast away", False),        # Known to fail Bechdel test
+    ("gladiator", False),        # Known to fail Bechdel test
+    ("high fidelity", False),    # Known to fail Bechdel test
+])
+def test_known_movie_validations(analyzer, movie_title, should_pass):
+    """Test Bechdel test analysis on known movies with verified results."""
+    result = analyzer.analyze_movie(movie_title)
+    
+    # Verify we got a result
+    assert result is not None, f"Failed to find script for {movie_title}"
+    
+    # Print debug info to help diagnose any failures
+    if result.failure_reasons:
+        print(f"\nFailure reasons for {movie_title}:")
+        for reason in result.failure_reasons:
+            print(f"- {reason}")
+    if result.female_characters:
+        print(f"\nFemale characters in {movie_title}:")
+        for char in result.female_characters:
+            print(f"- {char.name}")
+    if result.conversations:
+        print(f"\nConversations in {movie_title}:")
+        for conv in result.conversations:
+            print(f"Participants: {[p.name for p in conv.participants]}")
+            print(f"Dialogue: {conv.dialogue[:100]}...")  # First 100 chars
+            
+    # Check if the result matches expected
+    assert result.passes_test == should_pass, \
+        f"Expected {movie_title} to {'pass' if should_pass else 'fail'} but got opposite result"
+    
+    if should_pass:
+        # For passing movies, verify we have:
+        # 1. At least two female characters
+        assert len(result.female_characters) >= 2, \
+            f"Passing movie {movie_title} has fewer than 2 female characters"
+        
+        # 2. Some conversations between women
+        female_convs = [
+            conv for conv in result.conversations
+            if all(char.gender == "female" for char in conv.participants)
+            and len(conv.participants) >= 2
+        ]
+        assert len(female_convs) > 0, \
+            f"Passing movie {movie_title} has no conversations between women"
+    else:
+        # For failing movies, verify we have failure reasons
+        assert result.failure_reasons is not None and len(result.failure_reasons) > 0, \
+            f"Failing movie {movie_title} has no failure reasons"
