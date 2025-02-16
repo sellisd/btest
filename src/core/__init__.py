@@ -1,6 +1,5 @@
 """Core functionality for the Bechdel test analyzer."""
 
-import logging
 from .config import llm_config, log_config
 from .exceptions import (
     BtestError,
