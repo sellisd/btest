@@ -1,26 +1,25 @@
 """End-to-end tests for the movie script API endpoints."""
 
 import pytest
-from httpx import AsyncClient
+from fastapi.testclient import TestClient
 import asyncio
 
 from src.api.server import app
+from fastapi import FastAPI
 from src.core.analyzer import BechdelAnalyzer
 
 MOVIE_TITLE = "The Matrix"  # Using a known movie for consistent testing
 
 @pytest.fixture
-def app_config():
+def test_client():
     """Configure FastAPI app for testing."""
-    app.router.hostname = "test"
-    return app
+    return TestClient(app)
 
-@pytest.mark.asyncio
-async def test_script_search_and_analyze(app_config):
+def test_script_search_and_analyze(test_client):
     """Test the end-to-end flow of searching for a script and analyzing it."""
-    async with AsyncClient(app=app, base_url="http://test") as client:
+    with test_client as client:
         # Step 1: Search for the script
-        response = await client.get("/scripts/search", params={"title": MOVIE_TITLE})
+        response = client.get("/scripts/search", params={"title": MOVIE_TITLE})
         assert response.status_code == 200, f"Script search failed: {response.text}"
         search_result = response.json()
 
@@ -30,7 +29,7 @@ async def test_script_search_and_analyze(app_config):
         assert "source" in search_result, "Search result missing source"
 
         # Step 2: Get the full script
-        response = await client.get(f"/scripts/{MOVIE_TITLE}")
+        response = client.get(f"/scripts/{MOVIE_TITLE}")
         assert response.status_code == 200, f"Script retrieval failed: {response.text}"
         script_result = response.json()
 
