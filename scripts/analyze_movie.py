@@ -4,18 +4,19 @@
 import argparse
 import asyncio
 import aiohttp
-from difflib import SequenceMatcher
 from typing import List, Optional, Dict, Any
 from src.core.analyzer import BechdelAnalyzer
 from src.core.conversation import Conversation
 
 API_BASE_URL = "http://localhost:8000"
 
+
 def print_section(title: str):
     """Print a formatted section header."""
     print(f"\n{'-' * 80}")
     print(f"{title}")
     print(f"{'-' * 80}")
+
 
 def print_conversations(
     conversations: List[Conversation], show_only_female: bool = False
@@ -33,12 +34,13 @@ def print_conversations(
         print(conv.dialogue)
         print("-" * 40)
 
+
 async def get_script(title: str) -> Optional[Dict[str, Any]]:
     """Get script from API.
-    
+
     Args:
         title: Movie title to search for
-        
+
     Returns:
         Script data if found, None otherwise
     """
@@ -46,23 +48,21 @@ async def get_script(title: str) -> Optional[Dict[str, Any]]:
         try:
             # First search for the script
             async with session.get(
-                f"{API_BASE_URL}/scripts/search",
-                params={"title": title}
+                f"{API_BASE_URL}/scripts/search", params={"title": title}
             ) as resp:
                 if resp.status != 200:
                     return None
                 search_result = await resp.json()
 
             # Then get the full script
-            async with session.get(
-                f"{API_BASE_URL}/scripts/{title}"
-            ) as resp:
+            async with session.get(f"{API_BASE_URL}/scripts/{title}") as resp:
                 if resp.status != 200:
                     return None
                 return await resp.json()
         except aiohttp.ClientError:
             print("Error: Could not connect to script API server. Is it running?")
             return None
+
 
 async def analyze_movie(analyzer: BechdelAnalyzer, title: str):
     """Analyze a movie script and print results.
@@ -127,6 +127,7 @@ async def analyze_movie(analyzer: BechdelAnalyzer, title: str):
         for reason in result.failure_reasons:
             print(f"- {reason}")
 
+
 async def main_async():
     """Async main entry point."""
     parser = argparse.ArgumentParser(
@@ -140,9 +141,11 @@ async def main_async():
     analyzer = BechdelAnalyzer()
     await analyze_movie(analyzer, args.title)
 
+
 def main():
     """Main entry point."""
     asyncio.run(main_async())
+
 
 if __name__ == "__main__":
     main()

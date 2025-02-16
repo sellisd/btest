@@ -6,12 +6,16 @@ from typing import Optional, List
 from pydantic import BaseModel, Field, field_validator
 from pathlib import Path
 
+
 class ConfigError(Exception):
     """Base exception for configuration errors."""
+
     pass
+
 
 class LLMConfigModel(BaseModel):
     """Pydantic model for LLM configuration validation."""
+
     model: str = Field(default="llama2", min_length=1)
     host: Optional[str] = Field(default="http://localhost:11434")
     timeout: int = Field(default=30, ge=1)
@@ -24,8 +28,10 @@ class LLMConfigModel(BaseModel):
             return f"http://{v}"
         return v
 
+
 class CORSConfigModel(BaseModel):
     """Pydantic model for CORS configuration validation."""
+
     allow_origins: List[str] = Field(default=["*"])
     allow_credentials: bool = Field(default=True)
     allow_methods: List[str] = Field(default=["*"])
@@ -38,14 +44,18 @@ class CORSConfigModel(BaseModel):
             raise ValueError('Cannot mix "*" with other origins')
         return v
 
+
 class CacheConfigModel(BaseModel):
     """Pydantic model for cache configuration validation."""
+
     duration: int = Field(default=86400, ge=1)  # 24 hours in seconds
     directory: Path = Field(default=Path("data/cache"))
+
 
 @dataclass
 class LLMConfig:
     """Configuration for LLM integration."""
+
     model: str = field(default="llama2")
     host: Optional[str] = field(default="http://localhost:11434")
     timeout: int = field(default=30)
@@ -78,9 +88,11 @@ class LLMConfig:
         except ValueError as e:
             raise ConfigError(f"Invalid LLM configuration: {str(e)}")
 
+
 @dataclass
 class LogConfig:
     """Configuration for logging."""
+
     level: str = field(default="INFO")
     format: str = field(default="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
 
@@ -102,9 +114,11 @@ class LogConfig:
             ),
         )
 
+
 @dataclass
 class CORSConfig:
     """Configuration for CORS settings."""
+
     allow_origins: List[str] = field(default_factory=lambda: ["*"])
     allow_credentials: bool = field(default=True)
     allow_methods: List[str] = field(default_factory=lambda: ["*"])
@@ -145,9 +159,11 @@ class CORSConfig:
         except ValueError as e:
             raise ConfigError(f"Invalid CORS configuration: {str(e)}")
 
+
 @dataclass
 class CacheConfig:
     """Configuration for caching."""
+
     duration: int = field(default=86400)  # 24 hours in seconds
     directory: Path = field(default=Path("data/cache"))
 
@@ -160,17 +176,12 @@ class CacheConfig:
             directory = Path(os.getenv("CACHE_DIR", "data/cache"))
 
             # Validate using pydantic model
-            config_model = CacheConfigModel(
-                duration=duration,
-                directory=directory
-            )
+            config_model = CacheConfigModel(duration=duration, directory=directory)
 
-            return cls(
-                duration=config_model.duration,
-                directory=config_model.directory
-            )
+            return cls(duration=config_model.duration, directory=config_model.directory)
         except ValueError as e:
             raise ConfigError(f"Invalid cache configuration: {str(e)}")
+
 
 # Global configuration instances
 try:
@@ -180,5 +191,6 @@ try:
     cache_config = CacheConfig.from_env()
 except ConfigError as e:
     import sys
+
     print(f"Configuration error: {e}", file=sys.stderr)
     sys.exit(1)

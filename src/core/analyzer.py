@@ -8,7 +8,6 @@ from .text_processor import TextProcessor
 from .character import Character, CharacterClassifier
 from .conversation import Conversation, ConversationAnalyzer
 from .llm_helper import validate_bechdel_result
-from .script_finder import ScriptFinder
 
 
 @dataclass
@@ -144,19 +143,13 @@ class BechdelAnalyzer:
         script_text = Path(file_path).read_text()
         return self.analyze_script(script_text)
 
-    def analyze_movie(self, title: str) -> Optional[BechdelResult]:
-        """Analyze movie by title using the script finder.
+    def analyze_movie(self, script: str) -> BechdelResult:
+        """Analyze movie script directly.
 
         Args:
-            title: Movie title to search and analyze.
+            script: Movie script text to analyze.
 
         Returns:
-            BechdelResult if script is found, None otherwise.
+            BechdelResult containing the analysis.
         """
-        finder = ScriptFinder()
-        script = finder.find_script(title)
-
-        if script is None:
-            return None
-
         return self.analyze_script(script)

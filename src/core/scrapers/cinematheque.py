@@ -7,7 +7,7 @@ from urllib.parse import urljoin
 from .base import BaseScraper, ScrapingError
 
 
-class CinemathequeScaper(BaseScraper):
+class CinemathequeScraper(BaseScraper):
     """Scraper for Cinematheque.fr script collection."""
 
     BASE_URL = "https://www.cinematheque.fr"
@@ -132,5 +132,5 @@ class CinemathequeScaper(BaseScraper):
     def __repr__(self) -> str:
         """Return string representation."""
         return (
-            f"CinemathequeScaper(rate_limit={self.rate_limit}, timeout={self.timeout})"
+            f"CinemathequeScraper(rate_limit={self.rate_limit}, timeout={self.timeout})"
         )
