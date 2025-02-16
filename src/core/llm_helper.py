@@ -17,7 +17,7 @@ try:
     # Initialize Ollama with configured model
     llm = OllamaLLM(
         model=llm_config.model,
-        base_url=f"http://{llm_config.host}" if llm_config.host else None,
+        base_url=llm_config.host if llm_config.host else None,
         timeout=llm_config.timeout,
     )
 except Exception as e:
@@ -55,17 +55,9 @@ topic_prompt = PromptTemplate(
 
 # Create modern runnable chains
 if llm:
-    gender_chain = (
-        RunnableParallel({"prompt": gender_prompt})
-        | {"response": RunnablePassthrough() | llm}
-        | (lambda x: x["response"].strip().lower())
-    )
+    gender_chain = llm | (lambda x: x.strip().lower())
 
-    topic_chain = (
-        RunnableParallel({"prompt": topic_prompt})
-        | {"response": RunnablePassthrough() | llm}
-        | (lambda x: x["response"].strip().lower() == "true")
-    )
+    topic_chain = (llm | (lambda x: x.strip().lower() == "true"))
 else:
     gender_chain = topic_chain = None
 
@@ -89,11 +81,13 @@ def detect_gender(character_name: str, context: Optional[str] = None) -> str:
         return "unknown"
 
     try:
-        inputs: Dict[str, Any] = {
-            "character_name": character_name,
-            "context": context or f"Character named {character_name} in a script.",
-        }
-        result = gender_chain.invoke(inputs)
+        # Format the prompt first
+        result = gender_chain.invoke(
+            gender_prompt.format(
+                character_name=character_name,
+                context=context or f"Character named {character_name} in a script.",
+            )
+        )
         if result in ["female", "male", "unknown"]:
             return result
 
@@ -122,8 +116,9 @@ def is_conversation_about_men(dialogue: List[str]) -> bool:
         return _heuristic_male_topic_detection(dialogue)
 
     try:
-        inputs: Dict[str, Any] = {"dialogue": "\n".join(dialogue)}
-        return topic_chain.invoke(inputs)
+        return topic_chain.invoke(
+            topic_prompt.format(dialogue="\n".join(dialogue))
+        )
     except Exception as e:
         logger.error(f"LLM topic detection failed: {e}")
         logger.info("Falling back to heuristic analysis")

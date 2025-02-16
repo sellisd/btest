@@ -9,6 +9,24 @@ class TextProcessor:
 
     def __init__(self):
         """Initialize the text processor with regex patterns."""
+        # Common script formatting markers to ignore
+        self.formatting_markers = {
+            "FADE IN",
+            "FADE OUT",
+            "DISSOLVE TO",
+            "CUT TO",
+            "SMASH CUT",
+            "FADE TO BLACK",
+            "ROLL CREDITS",
+            "THE END",
+            "CONTINUED",
+            "ANGLE ON",
+            "CLOSE ON",
+            "PAN TO",
+            "TRACKING",
+            "WIDE SHOT",
+        }
+        
         self.dialogue_pattern = re.compile(
             r"(?P<character>[A-Z][A-Z\s]+):\s*(?P<dialogue>.*?)(?=\n[A-Z][A-Z\s]+:|$)",
             re.MULTILINE | re.DOTALL,
@@ -46,6 +64,9 @@ class TextProcessor:
 
         for match in matches:
             character = match.group("character").strip()
+            # Skip formatting markers
+            if any(marker in character for marker in self.formatting_markers):
+                continue
             dialogue = match.group("dialogue").strip()
             dialogue = self._clean_text(dialogue)
             if dialogue:  # Only add non-empty dialogues
