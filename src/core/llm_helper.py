@@ -1,11 +1,10 @@
 """Module for LLM integration using LangChain with Ollama."""
 
 from functools import lru_cache
-from typing import List, Optional, Dict, Any
+from typing import List, Optional
 
 from langchain_ollama import OllamaLLM
 from langchain.prompts import PromptTemplate
-from langchain_core.runnables import RunnablePassthrough, RunnableParallel
 
 from .config import llm_config
 from .exceptions import LLMError
@@ -57,7 +56,7 @@ topic_prompt = PromptTemplate(
 if llm:
     gender_chain = llm | (lambda x: x.strip().lower())
 
-    topic_chain = (llm | (lambda x: x.strip().lower() == "true"))
+    topic_chain = llm | (lambda x: x.strip().lower() == "true")
 else:
     gender_chain = topic_chain = None
 
@@ -116,9 +115,7 @@ def is_conversation_about_men(dialogue: List[str]) -> bool:
         return _heuristic_male_topic_detection(dialogue)
 
     try:
-        return topic_chain.invoke(
-            topic_prompt.format(dialogue="\n".join(dialogue))
-        )
+        return topic_chain.invoke(topic_prompt.format(dialogue="\n".join(dialogue)))
     except Exception as e:
         logger.error(f"LLM topic detection failed: {e}")
         logger.info("Falling back to heuristic analysis")

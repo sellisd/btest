@@ -26,7 +26,7 @@ class TextProcessor:
             "TRACKING",
             "WIDE SHOT",
         }
-        
+
         self.dialogue_pattern = re.compile(
             r"(?P<character>[A-Z][A-Z\s]+):\s*(?P<dialogue>.*?)(?=\n[A-Z][A-Z\s]+:|$)",
             re.MULTILINE | re.DOTALL,
