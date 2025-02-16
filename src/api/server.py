@@ -49,6 +49,7 @@ SCRAPERS: List[BaseScraper] = [
 ]
 analyzer = BechdelAnalyzer()
 
+
 def get_cached_script(title: str) -> Optional[ScriptResponse]:
     """Get script from cache if available and not expired."""
     try:
@@ -68,6 +69,7 @@ def get_cached_script(title: str) -> Optional[ScriptResponse]:
         logger.warning(f"Cache read error for {title}: {e}")
         return None
 
+
 def cache_script(title: str, response: ScriptResponse) -> None:
     """Cache script response."""
     try:
@@ -84,6 +86,7 @@ def cache_script(title: str, response: ScriptResponse) -> None:
     except Exception as e:
         logger.warning(f"Cache write error for {title}: {e}")
 
+
 @app.exception_handler(ScrapingError)
 async def scraping_exception_handler(request, exc: ScrapingError):
     """Handle scraping errors."""
@@ -93,6 +96,7 @@ async def scraping_exception_handler(request, exc: ScrapingError):
             error="Script scraping failed", details=str(exc)
         ).model_dump(),
     )
+
 
 @app.get(
     "/scripts/search",
@@ -112,6 +116,7 @@ async def search_script(
 
     # If no script found in any source
     raise HTTPException(status_code=404, detail=f"No script found for movie: {title}")
+
 
 @app.get(
     "/scripts/{title}",
@@ -154,6 +159,7 @@ async def get_script(title: str) -> ScriptResponse:
     # If no script found in any source
     raise HTTPException(status_code=404, detail=f"No script found for movie: {title}")
 
+
 @app.get(
     "/movies/{title}/bechdel-score",
     response_model=BechdelScoreResponse,
@@ -161,28 +167,32 @@ async def get_script(title: str) -> ScriptResponse:
 )
 async def get_bechdel_score(title: str) -> BechdelScoreResponse:
     """Get Bechdel test analysis for a movie.
-    
+
     Fetches the movie script and runs Bechdel test analysis on it.
     """
     # First get the script
     script_response = await get_script(title)
-    
+
     # Run Bechdel analysis
     result = analyzer.analyze_script(script_response.script)
-    
+
     # Count female conversations
-    num_female_conversations = len([
-        conv for conv in (result.conversations or [])
-        if all(char.gender == "female" for char in conv.participants)
-        and len(conv.participants) >= 2
-    ])
-    
+    num_female_conversations = len(
+        [
+            conv
+            for conv in (result.conversations or [])
+            if all(char.gender == "female" for char in conv.participants)
+            and len(conv.participants) >= 2
+        ]
+    )
+
     return BechdelScoreResponse(
         passes_test=result.passes_test,
         female_characters=[char.name for char in result.female_characters],
         failure_reasons=result.failure_reasons,
-        num_female_conversations=num_female_conversations
+        num_female_conversations=num_female_conversations,
     )
+
 
 def start_server():
     """Start the FastAPI server using uvicorn."""

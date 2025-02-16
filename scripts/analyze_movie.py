@@ -52,7 +52,7 @@ async def get_script(title: str) -> Optional[Dict[str, Any]]:
             ) as resp:
                 if resp.status != 200:
                     return None
-                search_result = await resp.json()
+                await resp.json()
 
             # Then get the full script
             async with session.get(f"{API_BASE_URL}/scripts/{title}") as resp:

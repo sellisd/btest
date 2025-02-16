@@ -204,4 +204,4 @@ def validate_bechdel_result(
         return validated
     except Exception as e:
         logger.error(f"LLM validation failed: {e}")
-        raise ValidationError(f"Bechdel test validation failed: {e}") from e
+        raise RuntimeError(f"Bechdel test validation failed: {e}") from e

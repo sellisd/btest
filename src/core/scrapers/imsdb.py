@@ -19,7 +19,6 @@ class IMSDBScraper(BaseScraper):
 
     async def search_script(self, title: str) -> Optional[Dict[str, Any]]:
         """Search for a movie script on IMSDB."""
-        search_params = {"query": title}
         headers = {
             "User-Agent": "Mozilla/5.0 (compatible; MovieScriptBot/1.0)",
             "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",

@@ -74,7 +74,7 @@ class BaseScraper(ABC):
                     )
 
                 # Try to get the encoding from the response headers
-                content_type = response.headers.get("Content-Type", "")
+                response.headers.get("Content-Type", "")
                 encoding = response.charset or "utf-8"
 
                 try:
