@@ -10,12 +10,13 @@ from ..exceptions import ScrapingError
 
 logger = logging.getLogger(__name__)
 
+
 class BaseScraper(ABC):
     """Abstract base class for movie script scrapers."""
-    
+
     def __init__(self, rate_limit: int = 1, timeout: int = 30):
         """Initialize the scraper.
-        
+
         Args:
             rate_limit: Minimum seconds between requests
             timeout: Request timeout in seconds
@@ -47,28 +48,46 @@ class BaseScraper(ABC):
 
     async def _fetch(self, url: str, headers: Optional[Dict[str, str]] = None) -> str:
         """Fetch a URL with rate limiting and retries.
-        
+
         Args:
             url: URL to fetch
             headers: Optional request headers
-        
+
         Returns:
             Response text
-            
+
         Raises:
-            ScrapingError: If the request fails after retries
+            ScrapingError: If the request fails after retries or encoding issues
         """
         if not self._session:
             raise ScrapingError("Session not initialized. Use async context manager.")
-            
+
         await self._wait_for_rate_limit()
-        
+
         try:
-            async with self._session.get(url, headers=headers, timeout=self.timeout) as response:
+            async with self._session.get(
+                url, headers=headers, timeout=self.timeout
+            ) as response:
                 if response.status != 200:
-                    raise ScrapingError(f"HTTP {response.status}: {await response.text()}")
-                return await response.text()
+                    raise ScrapingError(
+                        f"HTTP {response.status}: {await response.text()}"
+                    )
                 
+                # Try to get the encoding from the response headers
+                content_type = response.headers.get('Content-Type', '')
+                encoding = response.charset or 'utf-8'
+                
+                try:
+                    return await response.text(encoding=encoding)
+                except UnicodeDecodeError:
+                    # Fallback to common encodings if the detected one fails
+                    for fallback_encoding in ['latin1', 'cp1252', 'iso-8859-1']:
+                        try:
+                            return await response.text(encoding=fallback_encoding)
+                        except UnicodeDecodeError:
+                            continue
+                    raise ScrapingError(f"Unable to decode response with any supported encoding")
+
         except asyncio.TimeoutError:
             raise ScrapingError(f"Request timed out after {self.timeout} seconds")
         except aiohttp.ClientError as e:
@@ -77,10 +96,10 @@ class BaseScraper(ABC):
     @abstractmethod
     async def search_script(self, title: str) -> Optional[Dict[str, Any]]:
         """Search for a movie script.
-        
+
         Args:
             title: Movie title to search for
-            
+
         Returns:
             Dict containing script info if found, None otherwise
         """
@@ -89,13 +108,13 @@ class BaseScraper(ABC):
     @abstractmethod
     async def get_script(self, script_url: str) -> str:
         """Fetch and parse a script from its URL.
-        
+
         Args:
             script_url: URL to fetch script from
-            
+
         Returns:
             Parsed script text
-            
+
         Raises:
             ScrapingError: If script cannot be fetched/parsed
         """
