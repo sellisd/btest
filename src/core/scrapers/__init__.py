@@ -4,4 +4,4 @@ from .base import BaseScraper, ScrapingError
 from .imsdb import IMSDBScraper
 from .cinematheque import CinemathequeScaper
 
-__all__ = ['BaseScraper', 'IMSDBScraper', 'CinemathequeScaper', 'ScrapingError']
+__all__ = ["BaseScraper", "IMSDBScraper", "CinemathequeScaper", "ScrapingError"]

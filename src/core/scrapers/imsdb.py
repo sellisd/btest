@@ -5,6 +5,7 @@ from typing import Optional, Dict, Any
 from bs4 import BeautifulSoup
 from .base import BaseScraper, ScrapingError
 
+
 class IMSDBScraper(BaseScraper):
     """Scraper for the Internet Movie Script Database (IMSDB)."""
 
@@ -17,10 +18,10 @@ class IMSDBScraper(BaseScraper):
 
     async def search_script(self, title: str) -> Optional[Dict[str, Any]]:
         """Search for a movie script on IMSDB.
-        
+
         Args:
             title: Movie title to search for
-            
+
         Returns:
             Dict with script info if found, None otherwise
         """
@@ -33,44 +34,39 @@ class IMSDBScraper(BaseScraper):
         try:
             # Search for the script
             html = await self._fetch(
-                f"{self.SEARCH_URL}?query={title.replace(' ', '+')}",
-                headers=headers
+                f"{self.SEARCH_URL}?query={title.replace(' ', '+')}", headers=headers
             )
             soup = BeautifulSoup(html, "html.parser")
-            
+
             # Find script links in search results
             results = soup.select("p a[href*='/Movie Scripts/']")
-            
+
             if not results:
                 return None
-                
+
             # Get the first result (most relevant match)
             script_link = results[0]
             script_title = script_link.text.strip()
             script_path = script_link["href"]
-            
+
             # Convert relative URL to absolute
             if script_path.startswith("/"):
                 script_path = f"{self.BASE_URL}{script_path}"
-                
-            return {
-                "title": script_title,
-                "url": script_path,
-                "source": "IMSDB"
-            }
-            
+
+            return {"title": script_title, "url": script_path, "source": "IMSDB"}
+
         except Exception as e:
             raise ScrapingError(f"Failed to search IMSDB: {str(e)}")
 
     async def get_script(self, script_url: str) -> str:
         """Fetch and parse a script from IMSDB.
-        
+
         Args:
             script_url: Script page URL
-            
+
         Returns:
             Parsed script text
-            
+
         Raises:
             ScrapingError: If script cannot be fetched/parsed
         """
@@ -83,33 +79,37 @@ class IMSDBScraper(BaseScraper):
             # First get the script viewer page
             html = await self._fetch(script_url, headers=headers)
             soup = BeautifulSoup(html, "html.parser")
-            
+
             # Find the actual script content link
             script_link = soup.select_one("table.script-details a[href*='.html']")
             if not script_link:
                 raise ScrapingError("Could not find script content link")
-                
+
             script_path = script_link["href"]
             if script_path.startswith("/"):
                 script_path = f"{self.BASE_URL}{script_path}"
-                
+
             # Now fetch the actual script content
             html = await self._fetch(script_path, headers=headers)
             soup = BeautifulSoup(html, "html.parser")
-            
+
             # Find the pre-formatted script text
             script_pre = soup.find("pre")
             if not script_pre:
                 raise ScrapingError("Could not find script content")
-                
+
             script_text = script_pre.get_text(strip=True)
-            
+
             # Basic cleaning
-            script_text = re.sub(r'\n{3,}', '\n\n', script_text)  # Remove excessive newlines
-            script_text = re.sub(r'[ \t]+\n', '\n', script_text)  # Remove trailing whitespace
-            
+            script_text = re.sub(
+                r"\n{3,}", "\n\n", script_text
+            )  # Remove excessive newlines
+            script_text = re.sub(
+                r"[ \t]+\n", "\n", script_text
+            )  # Remove trailing whitespace
+
             return script_text
-            
+
         except Exception as e:
             raise ScrapingError(f"Failed to fetch script from IMSDB: {str(e)}")
 

@@ -1,6 +1,5 @@
 """FastAPI server for movie script scraping API."""
 
-import asyncio
 from typing import Optional
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
@@ -11,8 +10,13 @@ import json
 import time
 
 from .models import ScriptSearchResult, ScriptResponse, ErrorResponse
-from typing import List, Type
-from ..core.scrapers import BaseScraper, IMSDBScraper, CinemathequeScraper, ScrapingError
+from typing import List
+from ..core.scrapers import (
+    BaseScraper,
+    IMSDBScraper,
+    CinemathequeScraper,
+    ScrapingError,
+)
 
 # Setup logging
 logger = logging.getLogger(__name__)
@@ -39,12 +43,13 @@ app.add_middleware(
 # Initialize scrapers in priority order
 SCRAPERS: List[BaseScraper] = [
     IMSDBScraper(),  # Try IMSDB first
-    CinemathequeScraper()  # Fall back to Cinematheque
+    CinemathequeScraper(),  # Fall back to Cinematheque
 ]
 
 # Simple cache implementation
 CACHE_DIR = Path("data/cache")
 CACHE_DURATION = 86400  # 24 hours in seconds
+
 
 def get_cached_script(title: str) -> Optional[ScriptResponse]:
     """Get script from cache if available and not expired."""
@@ -52,32 +57,36 @@ def get_cached_script(title: str) -> Optional[ScriptResponse]:
         cache_file = CACHE_DIR / f"{title.lower().replace(' ', '_')}.json"
         if not cache_file.exists():
             return None
-            
-        with open(cache_file, 'r', encoding='utf-8') as f:
+
+        with open(cache_file, "r", encoding="utf-8") as f:
             data = json.load(f)
-            
+
         # Check if cache is expired
-        if time.time() - data['timestamp'] > CACHE_DURATION:
+        if time.time() - data["timestamp"] > CACHE_DURATION:
             return None
-            
-        return ScriptResponse(**data['script'])
+
+        return ScriptResponse(**data["script"])
     except Exception as e:
         logger.warning(f"Cache read error for {title}: {e}")
         return None
+
 
 def cache_script(title: str, response: ScriptResponse) -> None:
     """Cache script response."""
     try:
         CACHE_DIR.mkdir(parents=True, exist_ok=True)
         cache_file = CACHE_DIR / f"{title.lower().replace(' ', '_')}.json"
-        
-        with open(cache_file, 'w', encoding='utf-8') as f:
-            json.dump({
-                'timestamp': time.time(),
-                'script': response.model_dump()
-            }, f, ensure_ascii=False, indent=2)
+
+        with open(cache_file, "w", encoding="utf-8") as f:
+            json.dump(
+                {"timestamp": time.time(), "script": response.model_dump()},
+                f,
+                ensure_ascii=False,
+                indent=2,
+            )
     except Exception as e:
         logger.warning(f"Cache write error for {title}: {e}")
+
 
 @app.exception_handler(ScrapingError)
 async def scraping_exception_handler(request, exc: ScrapingError):
@@ -85,21 +94,18 @@ async def scraping_exception_handler(request, exc: ScrapingError):
     return JSONResponse(
         status_code=503,  # Service Unavailable
         content=ErrorResponse(
-            error="Script scraping failed",
-            details=str(exc)
-        ).model_dump()
+            error="Script scraping failed", details=str(exc)
+        ).model_dump(),
     )
+
 
 @app.get(
     "/scripts/search",
     response_model=ScriptSearchResult,
-    responses={
-        404: {"model": ErrorResponse},
-        503: {"model": ErrorResponse}
-    }
+    responses={404: {"model": ErrorResponse}, 503: {"model": ErrorResponse}},
 )
 async def search_script(
-    title: str = Query(..., description="Movie title to search for")
+    title: str = Query(..., description="Movie title to search for"),
 ) -> ScriptSearchResult:
     """Search for a movie script."""
     # Try each scraper in order until we find a script
@@ -108,29 +114,22 @@ async def search_script(
             result = await scraper.search_script(title)
             if result:
                 return ScriptSearchResult(**result)
-                
+
     # If no script found in any source
-    raise HTTPException(
-        status_code=404,
-        detail=f"No script found for movie: {title}"
-    )
+    raise HTTPException(status_code=404, detail=f"No script found for movie: {title}")
+
 
 @app.get(
     "/scripts/{title}",
     response_model=ScriptResponse,
-    responses={
-        404: {"model": ErrorResponse},
-        503: {"model": ErrorResponse}
-    }
+    responses={404: {"model": ErrorResponse}, 503: {"model": ErrorResponse}},
 )
-async def get_script(
-    title: str
-) -> ScriptResponse:
+async def get_script(title: str) -> ScriptResponse:
     """Get a movie script by title."""
     # Check cache first
     if cached := get_cached_script(title):
         return cached
-        
+
     # Try each scraper in order until we find a script
     for scraper in SCRAPERS:
         async with scraper:
@@ -138,33 +137,32 @@ async def get_script(
             result = await scraper.search_script(title)
             if not result:
                 continue
-                
+
             try:
                 # Fetch full script
-                script_text = await scraper.get_script(result['url'])
-                
+                script_text = await scraper.get_script(result["url"])
+
                 response = ScriptResponse(
-                    title=result['title'],
+                    title=result["title"],
                     script=script_text,
-                    source=result['source'],
-                    url=result['url']
+                    source=result["source"],
+                    url=result["url"],
                 )
-                
+
                 # Cache the result
                 cache_script(title, response)
-                
+
                 return response
             except ScrapingError:
                 # If script fetch fails, try next scraper
                 continue
-    
+
     # If no script found in any source
-    raise HTTPException(
-        status_code=404,
-        detail=f"No script found for movie: {title}"
-    )
+    raise HTTPException(status_code=404, detail=f"No script found for movie: {title}")
+
 
 def start_server():
     """Start the FastAPI server using uvicorn."""
     import uvicorn
+
     uvicorn.run(app, host="0.0.0.0", port=8000)
