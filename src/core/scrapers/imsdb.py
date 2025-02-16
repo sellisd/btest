@@ -3,6 +3,7 @@
 import re
 from typing import Optional, Dict, Any
 from bs4 import BeautifulSoup
+from urllib.parse import quote  # Add this import at the top
 from .base import BaseScraper, ScrapingError
 
 
@@ -17,14 +18,7 @@ class IMSDBScraper(BaseScraper):
         super().__init__(rate_limit=rate_limit, timeout=timeout)
 
     async def search_script(self, title: str) -> Optional[Dict[str, Any]]:
-        """Search for a movie script on IMSDB.
-
-        Args:
-            title: Movie title to search for
-
-        Returns:
-            Dict with script info if found, None otherwise
-        """
+        """Search for a movie script on IMSDB."""
         search_params = {"query": title}
         headers = {
             "User-Agent": "Mozilla/5.0 (compatible; MovieScriptBot/1.0)",
@@ -47,13 +41,19 @@ class IMSDBScraper(BaseScraper):
             # Get the first result (most relevant match)
             script_link = results[0]
             script_title = script_link.text.strip()
-            script_path = script_link["href"]
+            
+            # Convert movie title to script URL format
+            # Example: "The Matrix" -> "Matrix,-The.html"
+            formatted_title = script_title.strip()
+            if formatted_title.lower().startswith("the "):
+                formatted_title = f"{formatted_title[4:]},-The"
+            formatted_title = formatted_title.replace(" ", "-")
+            
+            # Construct direct script URL
+            script_path = f"/scripts/{formatted_title}.html"
+            script_url = f"{self.BASE_URL}{quote(script_path)}"
 
-            # Convert relative URL to absolute
-            if script_path.startswith("/"):
-                script_path = f"{self.BASE_URL}{script_path}"
-
-            return {"title": script_title, "url": script_path, "source": "IMSDB"}
+            return {"title": script_title, "url": script_url, "source": "IMSDB"}
 
         except Exception as e:
             raise ScrapingError(f"Failed to search IMSDB: {str(e)}")
@@ -74,27 +74,13 @@ class IMSDBScraper(BaseScraper):
             "User-Agent": "Mozilla/5.0 (compatible; MovieScriptBot/1.0)",
             "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
         }
-
         try:
             # First get the script viewer page
             html = await self._fetch(script_url, headers=headers)
             soup = BeautifulSoup(html, "html.parser")
-
-            # Find the actual script content link
-            script_link = soup.select_one("table.script-details a[href*='.html']")
-            if not script_link:
-                raise ScrapingError("Could not find script content link")
-
-            script_path = script_link["href"]
-            if script_path.startswith("/"):
-                script_path = f"{self.BASE_URL}{script_path}"
-
-            # Now fetch the actual script content
-            html = await self._fetch(script_path, headers=headers)
-            soup = BeautifulSoup(html, "html.parser")
-
             # Find the pre-formatted script text
             script_pre = soup.find("pre")
+
             if not script_pre:
                 raise ScrapingError("Could not find script content")
 
