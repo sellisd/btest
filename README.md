@@ -75,6 +75,32 @@ Example response:
 }
 ```
 
+#### Get Bechdel Test Score
+
+```http
+GET /movies/{movie_title}/bechdel-score
+```
+
+Example response:
+```json
+{
+  "passes_test": true,
+  "female_characters": ["Trinity", "Oracle", "Switch"],
+  "num_female_conversations": 2,
+  "failure_reasons": null
+}
+```
+
+If the movie fails the test, the response might look like:
+```json
+{
+  "passes_test": false,
+  "female_characters": ["Sarah", "Maria"],
+  "num_female_conversations": 0,
+  "failure_reasons": ["No conversations between female characters found"]
+}
+```
+
 ### Error Responses
 
 The API uses standard HTTP status codes:
@@ -115,7 +141,8 @@ src/
   └── main.py           # Entry point
 tests/
   ├── test_api.py      # API tests
-  └── test_scrapers.py # Scraper tests
+  ├── test_api_endpoints.py # API tests
+  └── test_scrapers.py    # Scraper tests
 ```
 
 ### Contributing
