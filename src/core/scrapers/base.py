@@ -72,21 +72,23 @@ class BaseScraper(ABC):
                     raise ScrapingError(
                         f"HTTP {response.status}: {await response.text()}"
                     )
-                
+
                 # Try to get the encoding from the response headers
-                content_type = response.headers.get('Content-Type', '')
-                encoding = response.charset or 'utf-8'
-                
+                content_type = response.headers.get("Content-Type", "")
+                encoding = response.charset or "utf-8"
+
                 try:
                     return await response.text(encoding=encoding)
                 except UnicodeDecodeError:
                     # Fallback to common encodings if the detected one fails
-                    for fallback_encoding in ['latin1', 'cp1252', 'iso-8859-1']:
+                    for fallback_encoding in ["latin1", "cp1252", "iso-8859-1"]:
                         try:
                             return await response.text(encoding=fallback_encoding)
                         except UnicodeDecodeError:
                             continue
-                    raise ScrapingError(f"Unable to decode response with any supported encoding")
+                    raise ScrapingError(
+                        "Unable to decode response with any supported encoding"
+                    )
 
         except asyncio.TimeoutError:
             raise ScrapingError(f"Request timed out after {self.timeout} seconds")

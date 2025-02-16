@@ -41,14 +41,14 @@ class IMSDBScraper(BaseScraper):
             # Get the first result (most relevant match)
             script_link = results[0]
             script_title = script_link.text.strip()
-            
+
             # Convert movie title to script URL format
             # Example: "The Matrix" -> "Matrix,-The.html"
             formatted_title = script_title.strip()
             if formatted_title.lower().startswith("the "):
                 formatted_title = f"{formatted_title[4:]},-The"
             formatted_title = formatted_title.replace(" ", "-")
-            
+
             # Construct direct script URL
             script_path = f"/scripts/{formatted_title}.html"
             script_url = f"{self.BASE_URL}{quote(script_path)}"
