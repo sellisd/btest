@@ -31,6 +31,22 @@ def analyzer():
     """Create a BechdelAnalyzer instance for testing."""
     return BechdelAnalyzer()
 
+@pytest.fixture
+def mock_movie_data():
+    """Mock movie metadata for testing."""
+    return """m0 +++$+++ Test Movie +++$+++ 2020 +++$+++ 8.5 +++$+++ 1000 +++$+++ genre1"""
+
+@pytest.fixture
+def mock_lines_data():
+    """Mock movie lines for testing."""
+    return """L1 +++$+++ SARAH +++$+++ m0 +++$+++ SCENE1 +++$+++ Hello Mary!
+L2 +++$+++ MARY +++$+++ m0 +++$+++ SCENE1 +++$+++ Hi Sarah! Let's talk about science."""
+
+@pytest.fixture
+def mock_conversations_data():
+    """Mock conversation data for testing."""
+    return """c1 +++$+++ SARAH +++$+++ m0 +++$+++ ['L1', 'L2']"""
+
 def test_text_processor_extracts_dialogues(sample_script):
     """Test that TextProcessor correctly extracts character dialogues."""
     processor = TextProcessor()
@@ -72,12 +88,9 @@ def test_conversation_analyzer_finds_conversations(sample_script):
     analyzer = ConversationAnalyzer()
     conversations = analyzer.extract_conversations(character_lines, characters)
     
-    print("Found conversations:", len(conversations))  # Debug print
-    for conv in conversations:
-        print("Participants:", [p.name for p in conv.participants])
-        print("Dialogue:", conv.dialogue)
-    
     assert len(conversations) > 0
+    assert all(len(conv.participants) >= 2 for conv in conversations), "Each conversation should have at least 2 participants"
+    assert all(conv.dialogue for conv in conversations), "Each conversation should have dialogue"
 
 def test_conversation_analyzer_finds_female_conversations(sample_script):
     """Test that ConversationAnalyzer identifies conversations between women."""
@@ -94,12 +107,6 @@ def test_conversation_analyzer_finds_female_conversations(sample_script):
     analyzer = ConversationAnalyzer()
     conversations = analyzer.extract_conversations(character_lines, characters)
     
-    # Print debug information
-    print("All conversations:", len(conversations))
-    for conv in conversations:
-        print("Participants:", [p.name for p in conv.participants])
-        print("Gender:", [p.gender for p in conv.participants])
-    
     # Verify conversations between women
     female_conversations = [
         conv for conv in conversations
@@ -107,25 +114,18 @@ def test_conversation_analyzer_finds_female_conversations(sample_script):
         and len(conv.participants) >= 2
     ]
     
-    assert len(female_conversations) > 0
+    assert len(female_conversations) > 0, "Should find at least one conversation between women"
+    assert all(len(conv.participants) >= 2 for conv in female_conversations), "Female conversations should have at least 2 participants"
 
 def test_bechdel_analyzer_full_analysis(analyzer, sample_script):
     """Test full Bechdel test analysis on sample script."""
     result = analyzer.analyze_script(sample_script)
     
-    # Print debug information
-    print("Female characters:", [char.name for char in result.female_characters])
-    if result.conversations:
-        print("Conversations:", len(result.conversations))
-        for conv in result.conversations:
-            print("Participants:", [p.name for p in conv.participants])
-    print("Failure reasons:", result.failure_reasons)
-    
     assert isinstance(result, BechdelResult)
-    assert result.passes_test is True
-    assert len(result.female_characters) >= 2
-    assert result.conversations is not None
-    assert result.failure_reasons is None
+    assert result.passes_test is True, "Sample script should pass Bechdel test"
+    assert len(result.female_characters) >= 2, "Should identify at least 2 female characters"
+    assert result.conversations is not None, "Should identify conversations"
+    assert result.failure_reasons is None, "Passing test should have no failure reasons"
 
 def test_analyzer_with_script_file(analyzer):
     """Test analyzing script directly from file."""
@@ -135,19 +135,11 @@ def test_analyzer_with_script_file(analyzer):
     assert result.passes_test is True
     assert result.conversations is not None
 
-# New tests for analyze_movie functionality
-MOCK_MOVIES_DATA = """m0 +++$+++ Test Movie +++$+++ 2020 +++$+++ 8.5 +++$+++ 1000 +++$+++ genre1"""
-
-MOCK_LINES_DATA = """L1 +++$+++ SARAH +++$+++ m0 +++$+++ SCENE1 +++$+++ Hello Mary!
-L2 +++$+++ MARY +++$+++ m0 +++$+++ SCENE1 +++$+++ Hi Sarah! Let's talk about science."""
-
-MOCK_CONVERSATIONS_DATA = """c1 +++$+++ SARAH +++$+++ m0 +++$+++ ['L1', 'L2']"""
-
-def test_analyze_movie_found(analyzer):
+def test_analyze_movie_found(analyzer, mock_movie_data, mock_lines_data, mock_conversations_data):
     """Test analyzing movie by title when script is found."""
-    with patch('builtins.open', mock_open(read_data=MOCK_MOVIES_DATA)) as mock_movies_file, \
-         patch('builtins.open', mock_open(read_data=MOCK_LINES_DATA)) as mock_lines_file, \
-         patch('builtins.open', mock_open(read_data=MOCK_CONVERSATIONS_DATA)) as mock_conv_file, \
+    with patch('builtins.open', mock_open(read_data=mock_movie_data)) as mock_movies_file, \
+         patch('builtins.open', mock_open(read_data=mock_lines_data)) as mock_lines_file, \
+         patch('builtins.open', mock_open(read_data=mock_conversations_data)) as mock_conv_file, \
          patch('requests.get') as mock_get:
              
         mock_get.return_value.text = "mock data"
@@ -168,10 +160,10 @@ def test_analyze_movie_found(analyzer):
             assert len(result.female_characters) == 2
             assert result.passes_test is True
 
-def test_analyze_movie_not_found(analyzer):
+def test_analyze_movie_not_found(analyzer, mock_movie_data, mock_lines_data):
     """Test analyzing movie by title when script is not found."""
-    with patch('builtins.open', mock_open(read_data=MOCK_MOVIES_DATA)) as mock_movies_file, \
-         patch('builtins.open', mock_open(read_data=MOCK_LINES_DATA)) as mock_lines_file, \
+    with patch('builtins.open', mock_open(read_data=mock_movie_data)) as mock_movies_file, \
+         patch('builtins.open', mock_open(read_data=mock_lines_data)) as mock_lines_file, \
          patch('requests.get') as mock_get:
              
         mock_get.return_value.text = "mock data"
@@ -196,25 +188,8 @@ def test_known_movie_validations(analyzer, movie_title, should_pass):
     """Test Bechdel test analysis on known movies with verified results."""
     result = analyzer.analyze_movie(movie_title)
     
-    # Verify we got a result
     assert result is not None, f"Failed to find script for {movie_title}"
     
-    # Print debug info to help diagnose any failures
-    if result.failure_reasons:
-        print(f"\nFailure reasons for {movie_title}:")
-        for reason in result.failure_reasons:
-            print(f"- {reason}")
-    if result.female_characters:
-        print(f"\nFemale characters in {movie_title}:")
-        for char in result.female_characters:
-            print(f"- {char.name}")
-    if result.conversations:
-        print(f"\nConversations in {movie_title}:")
-        for conv in result.conversations:
-            print(f"Participants: {[p.name for p in conv.participants]}")
-            print(f"Dialogue: {conv.dialogue[:100]}...")  # First 100 chars
-            
-    # Check if the result matches expected
     assert result.passes_test == should_pass, \
         f"Expected {movie_title} to {'pass' if should_pass else 'fail'} but got opposite result"
     

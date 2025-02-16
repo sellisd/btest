@@ -12,7 +12,7 @@ import time
 
 from .models import ScriptSearchResult, ScriptResponse, ErrorResponse
 from typing import List, Type
-from ..core.scrapers import BaseScraper, IMSDBScraper, CinemathequeScaper, ScrapingError
+from ..core.scrapers import BaseScraper, IMSDBScraper, CinemathequeScraper, ScrapingError
 
 # Setup logging
 logger = logging.getLogger(__name__)
@@ -24,19 +24,22 @@ app = FastAPI(
     version="0.1.0",
 )
 
+# Import CORS config
+from ..core.config import cors_config
+
 # CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # In production, replace with specific origins
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_origins=cors_config.allow_origins,
+    allow_credentials=cors_config.allow_credentials,
+    allow_methods=cors_config.allow_methods,
+    allow_headers=cors_config.allow_headers,
 )
 
 # Initialize scrapers in priority order
 SCRAPERS: List[BaseScraper] = [
     IMSDBScraper(),  # Try IMSDB first
-    CinemathequeScaper()  # Fall back to Cinematheque
+    CinemathequeScraper()  # Fall back to Cinematheque
 ]
 
 # Simple cache implementation
