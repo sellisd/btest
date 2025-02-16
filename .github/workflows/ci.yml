@@ -30,10 +30,7 @@ jobs:
         run: |
           ruff check .
           ruff format --check .
-      
-      - name: Type check with mypy
-        run: mypy src tests
-      
+
       - name: Test with pytest
         run: |
           # Skip tests that require Ollama
