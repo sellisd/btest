@@ -1,124 +1,24 @@
 """Module for finding and retrieving movie scripts."""
 
 import logging
-from pathlib import Path
-from typing import Optional, Dict
-import pandas as pd
+import asyncio
+from typing import Optional, List
+from .scrapers.base import BaseScraper
+from .scrapers.imsdb import IMSDBScraper
 
 logger = logging.getLogger(__name__)
 
 
 class ScriptFinder:
-    """Handles retrieving movie scripts from Cornell Movie Dialog Corpus."""
+    """Handles retrieving movie scripts from online sources."""
 
-    def __init__(self, data_dir: Optional[str] = None):
-        """Initialize ScriptFinder.
+    def __init__(self):
+        """Initialize ScriptFinder with available scrapers."""
+        self.scrapers: List[BaseScraper] = [
+            IMSDBScraper()  # Add more scrapers here as they're implemented
+        ]
 
-        Args:
-            data_dir: Directory to store downloaded dataset files.
-                     Defaults to local Cornell corpus if not specified.
-        """
-        if data_dir is None:
-            data_dir = "data/cornell_data/cornell_movie_dialogs_corpus/cornell movie-dialogs corpus"
-        self.data_dir = Path(data_dir)
-
-        # Create data directory if it doesn't exist
-        self.data_dir.mkdir(parents=True, exist_ok=True)
-
-        # Required dataset files
-        self.movies_file = self.data_dir / "movie_titles_metadata.txt"
-        self.lines_file = self.data_dir / "movie_lines.txt"
-        self.conversations_file = self.data_dir / "movie_conversations.txt"
-
-        # Cache for loaded data
-        self._movies_df: Optional[pd.DataFrame] = None
-        self._dialogs: Optional[Dict] = None
-        self._lines: Optional[Dict] = None
-
-    def _load_data(self) -> None:
-        """Load dataset into memory if not already loaded."""
-        if self._movies_df is None or self._dialogs is None:
-            try:
-                # Check if required files exist
-                if not all(
-                    f.exists()
-                    for f in [
-                        self.movies_file,
-                        self.lines_file,
-                        self.conversations_file,
-                    ]
-                ):
-                    logger.warning(
-                        "Dataset files not found, initializing with empty data"
-                    )
-                    self._movies_df = pd.DataFrame(
-                        columns=["id", "title", "year", "rating", "votes", "genres"]
-                    )
-                    self._dialogs = {}
-                    self._lines = {}
-                    return
-
-                # Load movie metadata
-                self._movies_df = pd.read_csv(
-                    self.movies_file,
-                    sep=" \\+\\+\\+\\$\\+\\+\\+ ",
-                    names=["id", "title", "year", "rating", "votes", "genres"],
-                    engine="python",
-                    encoding="iso-8859-1",
-                    dtype={
-                        "id": str,
-                        "title": str,
-                        "year": str,
-                        "rating": float,
-                        "votes": float,
-                        "genres": str,
-                    },
-                )
-
-                # Load movie lines into a dictionary for quick lookup
-                self._lines = {}
-                with open(self.lines_file, "r", encoding="iso-8859-1") as f:
-                    for line in f:
-                        parts = line.strip().split(" +++$+++ ")
-                        if len(parts) == 5:
-                            line_id, character, movie_id, _, text = parts
-                            self._lines[line_id] = {
-                                "character": character,
-                                "movie_id": movie_id,
-                                "text": text,
-                            }
-
-                # Load movie conversations which define the line ordering
-                self._dialogs = {}
-                with open(self.conversations_file, "r", encoding="iso-8859-1") as f:
-                    for conversation in f:
-                        parts = conversation.strip().split(" +++$+++ ")
-                        if len(parts) == 4:
-                            # Extract line IDs from conversation
-                            movie_id = parts[2]
-                            line_ids = eval(
-                                parts[3]
-                            )  # Convert string list to actual list
-
-                            if movie_id not in self._dialogs:
-                                self._dialogs[movie_id] = []
-
-                            # Add each line in the conversation
-                            for line_id in line_ids:
-                                if line_id in self._lines:
-                                    line = self._lines[line_id]
-                                    self._dialogs[movie_id].append(
-                                        {
-                                            "character": line["character"],
-                                            "text": line["text"],
-                                        }
-                                    )
-
-            except Exception as e:
-                logger.error(f"Failed to load dataset: {e}")
-                raise
-
-    def find_script(self, title: str) -> Optional[str]:
+    async def find_script(self, title: str) -> Optional[str]:
         """Find and return movie script by title.
 
         Args:
@@ -127,38 +27,30 @@ class ScriptFinder:
         Returns:
             Formatted script text if found, None otherwise.
         """
-        self._load_data()
+        for scraper in self.scrapers:
+            try:
+                async with scraper:
+                    # Search for the script
+                    result = await scraper.search_script(title)
+                    if result:
+                        # Get the full script text
+                        script = await scraper.get_script(result["url"])
+                        logger.info(f"Found script for '{title}' on {result['source']}")
+                        return script
+            except Exception as e:
+                logger.error(f"Error searching {scraper.__class__.__name__}: {e}")
+                continue
 
-        # Search for movie
-        title = title.lower()
-        # Fill NaN values and convert to string before searching
-        movie = self._movies_df[
-            self._movies_df["title"]
-            .fillna("")
-            .astype(str)
-            .str.lower()
-            .str.contains(title)
-        ]
+        logger.warning(f"No script found for title: {title}")
+        return None
 
-        if len(movie) == 0:
-            logger.warning(f"No movie found matching title: {title}")
-            return None
+    def find_script_sync(self, title: str) -> Optional[str]:
+        """Synchronous wrapper for find_script.
 
-        if len(movie) > 1:
-            # If multiple matches, use the one with most votes
-            movie = movie.sort_values("votes", ascending=False).iloc[0]
-        else:
-            movie = movie.iloc[0]
+        Args:
+            title: Movie title to search for.
 
-        movie_id = movie["id"]
-
-        if movie_id not in self._dialogs:
-            logger.warning(f"No dialog found for movie: {title}")
-            return None
-
-        # Format dialog into script
-        script_lines = []
-        for dialog in self._dialogs[movie_id]:
-            script_lines.append(f"{dialog['character']}: {dialog['text']}")
-
-        return "\n".join(script_lines)
+        Returns:
+            Formatted script text if found, None otherwise.
+        """
+        return asyncio.run(self.find_script(title))
