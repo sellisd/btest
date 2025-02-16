@@ -123,8 +123,46 @@ Error response example:
 
 Run the test suite with:
 ```bash
-pytest
+pytest  # Run all tests (requires Ollama running locally)
+pytest -m "not llm"  # Skip tests requiring Ollama
 ```
+
+Note: LLM-dependent tests require Ollama running locally with the llama2 model installed:
+```bash
+ollama run llama2  # This will download and start the model if needed
+```
+
+### Code Quality
+
+This project uses several tools to ensure code quality:
+
+- **Black**: Code formatting
+  ```bash
+  black .  # Format code
+  black --check .  # Check formatting
+  ```
+
+- **Ruff**: Fast Python linter
+  ```bash
+  ruff check .  # Run linter
+  ruff format .  # Format code
+  ```
+
+- **mypy**: Static type checking
+  ```bash
+  mypy src tests  # Run type checker
+  ```
+
+### Continuous Integration
+
+The project uses GitHub Actions for continuous integration, which:
+- Runs on all push events to main and pull requests
+- Checks code formatting with Black
+- Runs linting with Ruff
+- Performs type checking with mypy
+- Executes non-LLM tests with pytest (LLM tests are skipped in CI)
+
+The CI workflow configuration can be found in `.github/workflows/ci.yml`.
 
 ### Project Structure
 
